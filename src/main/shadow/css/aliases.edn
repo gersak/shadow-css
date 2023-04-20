@@ -646,7 +646,6 @@
  :divide-y-4 [["& > * + *" {:border-top-width "4px", :border-bottom-width "0px"}]]
  :divide-y-8 [["& > * + *" {:border-top-width "8px", :border-bottom-width "0px"}]]
 
-
  ;; transforms
  :transition-none      {:transition-property "none"}
  :transition-all       {:transition-property "all"
