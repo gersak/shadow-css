@@ -96,10 +96,13 @@
 
   (emit-rule w sel rules)
 
-  (doseq [[media-query rules] at-rules]
-    (emitln w media-query "{")
+  (doseq [[nesting rules] at-rules]
+
+    (doseq [lvl nesting]
+      (emitln w lvl " {"))
     (emit-rule w sel rules)
-    (emitln w "}")))
+    (doseq [_ nesting]
+      (emitln w "}"))))
 
 (defn build-css-for-chunk [build-state chunk-id]
   (update-in build-state [:chunks chunk-id]
@@ -108,7 +111,8 @@
         :css
         (let [sw #?(:clj (StringWriter.) :cljs (StringBuffer.))]
           (when base
-            (emitln sw (:preflight-src build-state)))
+            (when-let [pre (:preflight-src build-state)]
+              (emitln sw pre)))
 
           #?@(:clj
               [(doseq [inc classpath-includes]
@@ -126,7 +130,7 @@
                     (cond
                       (string? x)
                       (let [re (re-pattern x)]
-                        #(re-find re %))
+                        #(re-find re (name %)))
 
                       (not (symbol? x))
                       (throw (ex-info "invalid include pattern" {:x x}))
@@ -159,6 +163,9 @@
               ;; npm support later
               (string? ns)
               m
+
+              (str/includes? (str ns) "*")
+              (throw (ex-info ":entries only takes full namespace names, not wildcards" {:ns ns}))
 
               :else
               (let [ns-info (get namespaces ns)]
@@ -265,20 +272,25 @@
 ;; it'll destroy some stuff for sure
 ;; but for now it seems to be ok and doesn't require parsing css
 (defn minify-chunk [chunk]
-  (update chunk :css
-    (fn [css]
-      (-> css
-          ;; collapse multiple whitespace to one first
-          (str/replace #"\s+" " ")
-          ;; remove comments
-          (str/replace #"\/\*(.*?)\*\/" "")
-          ;; remove a few more whitespace
-          (str/replace #"\s\{\s" "{")
-          (str/replace #";\s+\}\s*" "}")
-          (str/replace #";\s+" ";")
-          (str/replace #":\s+" ":")
-          (str/replace #"\s*,\s*" ",")
-          ))))
+  #?(:cljs
+     ;; FIXME: I don't know why the below regexp breaks in JS, look into it
+     ;; currently only using JS variant in self-hosted grove examples app, which doesn't minify anyways
+     chunk
+     :clj
+     (update chunk :css
+       (fn [css]
+         (-> css
+             ;; collapse multiple whitespace to one first
+             (str/replace #"\s+" " ")
+             ;; remove comments
+             (str/replace #"\/\*(.*?)\*\/" "")
+             ;; remove a few more whitespace
+             (str/replace #"\s\{\s" "{")
+             (str/replace #";\s+\}\s*" "}")
+             (str/replace #";\s+" ";")
+             (str/replace #":\s+" ":")
+             (str/replace #"\s*,\s*" ",")
+             )))))
 
 (defn minify [build-state]
   (update build-state :chunks update-vals minify-chunk))
@@ -350,10 +362,12 @@
      ;; width
      "w-" [:width]
      "max-w-" [:max-width]
+     "min-w-" [:min-width]
 
      ;; height
      "h-" [:height]
      "max-h-" [:max-height]
+     "min-h-" [:min-height]
 
      ;; flex
      "basis-" [:flex-basis]
@@ -407,6 +421,10 @@
     56 "14rem"
     60 "15rem"
     64 "16rem"
+    68 "17rem"
+    72 "18rem"
+    76 "19rem"
+    80 "20rem"
     96 "24rem"}})
 
 ;; IO stuff not available in CLJS environments
